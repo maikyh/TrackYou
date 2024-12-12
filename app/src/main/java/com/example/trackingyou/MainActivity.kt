@@ -1,15 +1,18 @@
 package com.example.trackingyou
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,7 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -93,24 +98,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NavigationBar() {
-    Box(
+fun TopNavigationBar() {
+    TopAppBar(
+        title = {
+            Text(
+                text = "TrackYou",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.SansSerif
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .background(color = Color(0xFF0066B2))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "TrackYou",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 34.sp,
-            textAlign = TextAlign.Center
-        )
-    }
+            .background(MaterialTheme.colorScheme.primary)
+    )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserListScreen(
     users: MutableList<User>,
@@ -121,11 +130,11 @@ fun UserListScreen(
     var userToDelete by remember { mutableStateOf<User?>(null) }
 
     Scaffold(
-        topBar = { NavigationBar() },
+        topBar = { TopNavigationBar() },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddUserDialog = true },
-                containerColor = Color(0xFF0066B2)
+                containerColor = MaterialTheme.colorScheme.secondary
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
@@ -133,9 +142,13 @@ fun UserListScreen(
                     tint = Color.White
                 )
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(modifier = Modifier
+            .padding(innerPadding)
+            .fillMaxSize()
+        ) {
             UserCellList(
                 users = users,
                 onEditUser = { user -> userToEdit = user },
@@ -192,23 +205,28 @@ fun UserCellList(
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier,
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
         items(users) { user ->
-            UserCell(
+            UserCard(
                 user = user,
                 onEditUser = onEditUser,
                 onDeleteUser = onDeleteUser,
                 onUserClick = onUserClick,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .fillMaxWidth()
+                    .animateContentSize()
             )
         }
     }
 }
 
 @Composable
-fun UserCell(
+fun UserCard(
     user: User,
     onEditUser: (User) -> Unit,
     onDeleteUser: (User) -> Unit,
@@ -218,13 +236,13 @@ fun UserCell(
     var expanded by remember { mutableStateOf(false) }
     var showAddRecordDialog by remember { mutableStateOf(false) }
 
-    Box(
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(color = Color(0xFFDBEAFF))
-            .border(width = 1.dp, color = Color.Black, shape = RoundedCornerShape(16.dp))
     ) {
         Row(
             modifier = Modifier
@@ -234,36 +252,33 @@ fun UserCell(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            Avatar(user = user)
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.AccountCircle,
-                    contentDescription = "User Avatar",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(32.dp)
+                Text(
+                    text = "${user.nombre} ${user.apellidos}",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = "${user.nombre} ${user.apellidos}",
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "Estatura: ${user.estatura} m, Peso: ${user.peso} kg",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Estatura: ${user.estatura} m | Peso: ${user.peso} kg",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Box {
                 IconButton(onClick = { expanded = true }) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "More options",
-                        tint = Color.Gray
+                        contentDescription = "Mis opciones",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -280,12 +295,12 @@ fun UserCell(
                         leadingIcon = {
                             Icon(
                                 Icons.Filled.Edit,
-                                contentDescription = "Editar"
+                                contentDescription = "Editar",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     )
 
-                    // Opción Agregar Registro
                     DropdownMenuItem(
                         text = { Text("Agregar Registro") },
                         onClick = {
@@ -295,7 +310,8 @@ fun UserCell(
                         leadingIcon = {
                             Icon(
                                 Icons.Filled.Add,
-                                contentDescription = "Agregar Registro"
+                                contentDescription = "Agregar Registro",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     )
@@ -309,7 +325,8 @@ fun UserCell(
                         leadingIcon = {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Eliminar"
+                                contentDescription = "Eliminar",
+                                tint = MaterialTheme.colorScheme.error
                             )
                         }
                     )
@@ -331,6 +348,25 @@ fun UserCell(
 }
 
 @Composable
+fun Avatar(user: User) {
+    val initials = "${user.nombre.firstOrNull()?.uppercaseChar() ?: 'U'}${user.apellidos.firstOrNull()?.uppercaseChar() ?: 'X'}"
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Text(
+            text = initials,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp
+        )
+    }
+}
+
+@Composable
 fun AddUserDialog(
     titleText: String,
     initialUser: User? = null,
@@ -344,31 +380,41 @@ fun AddUserDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(titleText) },
+        title = {
+            Text(
+                text = titleText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextField(
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
                     value = nombre,
                     onValueChange = { nombre = it },
                     label = { Text("Nombre") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                TextField(
+                OutlinedTextField(
                     value = apellidos,
                     onValueChange = { apellidos = it },
                     label = { Text("Apellidos") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                TextField(
+                OutlinedTextField(
                     value = estatura,
                     onValueChange = { estatura = it },
                     label = { Text("Estatura (m)") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TextField(
+                OutlinedTextField(
                     value = peso,
                     onValueChange = { peso = it },
                     label = { Text("Peso (kg)") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -384,12 +430,12 @@ fun AddUserDialog(
                     }
                 }
             ) {
-                Text(if (initialUser == null) "Agregar" else "Guardar")
+                Text(if (initialUser == null) "Agregar" else "Guardar", color = MaterialTheme.colorScheme.primary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -403,20 +449,30 @@ fun ConfirmDeleteDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Eliminar Usuario") },
+        title = {
+            Text(
+                text = "Eliminar Usuario",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
         text = {
-            Text("¿Estás seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta acción no se puede deshacer.")
+            Text(
+                "¿Estas seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta accion no se puede deshacer.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         },
         confirmButton = {
             TextButton(
                 onClick = onConfirm
             ) {
-                Text("Eliminar", color = Color.Red)
+                Text("Eliminar", color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -433,19 +489,27 @@ fun AddRecordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Agregar Registro para ${user.nombre}") },
+        title = {
+            Text(
+                text = "Agregar Registro para ${user.nombre}",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextField(
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
                     value = glucosa,
                     onValueChange = { glucosa = it },
                     label = { Text("Glucosa (mg/dL)") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TextField(
+                OutlinedTextField(
                     value = presion,
                     onValueChange = { presion = it },
-                    label = { Text("Presión Arterial (mmHg)") },
+                    label = { Text("Presion Arterial (mmHg)") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -460,12 +524,12 @@ fun AddRecordDialog(
                     }
                 }
             ) {
-                Text("Agregar")
+                Text("Agregar", color = MaterialTheme.colorScheme.primary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -482,20 +546,24 @@ fun UserDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("${user.nombre} ${user.apellidos}") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atras")
                     }
                 },
                 actions = {
                     IconButton(onClick = { showAddRecordDialog = true }) {
                         Icon(Icons.Filled.Add, contentDescription = "Agregar Registro")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -505,16 +573,24 @@ fun UserDetailScreen(
         ) {
             Text(
                 text = "Registros de Salud",
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             if (user.registros.isEmpty()) {
-                Text("No hay registros disponibles.", color = Color.Gray)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No hay registros disponibles.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
                 TableHeader()
-                LazyColumn {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     items(user.registros) { record ->
                         TableRow(record)
                     }
@@ -540,23 +616,26 @@ fun TableHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFE0E0E0))
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(8.dp)
     ) {
         Text(
             text = "Fecha",
-            modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold
+            modifier = Modifier.weight(2f),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
         )
         Text(
             text = "Glucosa",
             modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
         )
         Text(
-            text = "Presión",
+            text = "Presion",
             modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
@@ -566,27 +645,62 @@ fun TableRow(record: Record) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clip(RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
         Text(
             text = record.fecha,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(2f),
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = record.glucosa,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = record.presion,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun NavigationBarPreview() {
+fun TopNavigationBarPreview() {
     TrackingYouTheme {
-        NavigationBar()
+        TopNavigationBar()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun UserCardPreview() {
+    TrackingYouTheme {
+        UserCard(
+            user = User("Miguel", "Garza Carranza", "1.75", "70"),
+            onEditUser = {},
+            onDeleteUser = {},
+            onUserClick = {}
+        )
+    }
+}
+
+@SuppressLint("UnrememberedMutableState")
+@Preview(showBackground = true)
+@Composable
+fun UserListScreenPreview() {
+    TrackingYouTheme {
+        UserListScreen(
+            users = mutableStateListOf(
+                User("Miguel", "Garza Carranza", "1.75", "70"),
+                User("David", "Cardenas Gonzalez", "1.80", "75"),
+                User("Felipe", "Lara Adame", "1.70", "68")
+            ),
+            onUserClick = {}
+        )
     }
 }
