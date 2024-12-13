@@ -166,9 +166,18 @@ fun UserListScreen(
     var showAddUserDialog by remember { mutableStateOf(false) }
     var userToEdit by remember { mutableStateOf<User?>(null) }
     var userToDelete by remember { mutableStateOf<User?>(null) }
+    var searchText by remember { mutableStateOf("") } // Estado para la búsqueda
 
     Scaffold(
-        topBar = { TopNavigationBar() },
+        topBar = {
+            Column {
+                TopNavigationBar()
+                SearchBar(
+                    searchText = searchText,
+                    onSearchTextChange = { searchText = it }
+                )
+            }
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddUserDialog = true },
@@ -183,12 +192,18 @@ fun UserListScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Box(modifier = Modifier
-            .padding(innerPadding)
-            .fillMaxSize()
+        Box(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
         ) {
+            // Filtrar usuarios según el texto de búsqueda
+            val filteredUsers = users.filter {
+                it.nombre.contains(searchText, ignoreCase = true) ||
+                        it.apellidos.contains(searchText, ignoreCase = true)
+            }
             UserCellList(
-                users = users,
+                users = filteredUsers,
                 onEditUser = { user -> userToEdit = user },
                 onDeleteUser = { user -> userToDelete = user },
                 onUserClick = onUserClick
@@ -764,6 +779,29 @@ fun SplashScreen(onTimeout: () -> Unit) {
         )
     }
 }
+
+@Composable
+fun SearchBar(
+    searchText: String,
+    onSearchTextChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = searchText,
+        onValueChange = onSearchTextChange,
+        label = { Text("Buscar usuario") },
+        singleLine = true,
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = "Buscar"
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    )
+}
+
 //onboarding
 @Composable
 fun OnboardingScreen(navController: NavHostController) {
