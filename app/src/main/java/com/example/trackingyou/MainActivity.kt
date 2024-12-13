@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,18 +22,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.trackingyou.ui.theme.TrackingYouTheme
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -49,7 +55,6 @@ data class User(
     val peso: String,
     val registros: MutableList<Record> = mutableListOf()
 )
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +63,10 @@ class MainActivity : ComponentActivity() {
             TrackingYouTheme {
                 val navController = rememberNavController()
 
-                // Lista de usuarios con registros
+
+                var isSplashVisible by remember { mutableStateOf(true) }
+
+
                 val users = remember {
                     mutableStateListOf(
                         User("Miguel", "Garza Carranza", "1.75", "70"),
@@ -67,7 +75,34 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                NavHost(navController = navController, startDestination = "userList") {
+                // Navegación
+                NavHost(navController = navController, startDestination = if (isSplashVisible) "splash" else "onboarding") {
+                    // Ruta para el SplashScreen
+                    composable("splash") {
+                        SplashScreen(onTimeout = {
+                            isSplashVisible = false
+                            navController.navigate("onboarding") // Navega al onboarding después del splash
+                        })
+                    }
+
+                    // Ruta para el onboarding
+                    composable("onboarding") {
+                        OnboardingScreen(navController) // Usamos el OnboardingScreen que ya tienes
+                    }
+
+                    // Ruta para la pantalla principal (home)
+                    composable("home") {
+                        HomeScreen(
+                            onNavigateToUserList = {
+                                navController.navigate("userList") {
+                                    // Evita que el usuario pueda volver al onboarding
+                                    popUpTo("onboarding") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    // Ruta para la lista de usuarios
                     composable("userList") {
                         UserListScreen(
                             users = users,
@@ -76,6 +111,8 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+
+                    // Ruta para la pantalla de detalle del usuario
                     composable(
                         "userDetail/{userId}",
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
@@ -97,6 +134,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -702,5 +740,207 @@ fun UserListScreenPreview() {
             ),
             onUserClick = {}
         )
+    }
+
+}@Composable
+fun SplashScreen(onTimeout: () -> Unit) {
+
+    val imageModifier = Modifier
+        .fillMaxSize()
+        .wrapContentSize(Alignment.Center)
+
+    LaunchedEffect(Unit) {
+
+        delay(3000)
+        onTimeout()
+    }
+
+    // Contenedor para la imagen
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.img),
+            contentDescription = null,
+            modifier = imageModifier
+        )
+    }
+}
+//onboarding
+@Composable
+fun OnboardingScreen(navController: NavHostController) {
+    val pages = listOf(
+        OnboardingPage("Bienvenido", "¡Descubre las mejores funciones de nuestra app!", R.drawable.icon1),
+        OnboardingPage("Monitorea tu salud", "Registra tus datos y realiza un seguimiento de tu progreso.", R.drawable.icon2),
+        OnboardingPage("Mantente saludable", "Recibe recomendaciones personalizadas para un estilo de vida saludable.", R.drawable.icon3)
+    )
+
+    var currentPage by remember { mutableStateOf(0) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White) // Fondo degradado
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Imagen del Onboarding
+        Image(
+            painter = painterResource(id = pages[currentPage].image),
+            contentDescription = "Onboarding Image",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+                .clip(RoundedCornerShape(16.dp)),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Título
+        Text(
+            text = pages[currentPage].title,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Descripción
+        Text(
+            text = pages[currentPage].description,
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+            color = Color(0xFF486FC7),
+            modifier = Modifier
+                .padding(horizontal = 32.dp)
+
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Barra de progreso
+        Row(horizontalArrangement = Arrangement.Center) {
+            pages.forEachIndexed { index, _ ->
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(
+                            if (index == currentPage) Color.Blue else Color.Gray,
+                            shape = CircleShape
+                        )
+                        .padding(2.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Botones de navegación
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            if (currentPage > 0) {
+                Button(
+                    onClick = { currentPage-- },
+                    colors = ButtonDefaults.buttonColors(containerColor  = Color(0xFF486FC7)),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text("Atrás", color = Color.White)
+                }
+            }
+
+            if (currentPage < pages.size - 1) {
+                Button(
+                    onClick = { currentPage++ },
+                    colors = ButtonDefaults.buttonColors(containerColor  = Color(0xFF0838A8)),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text("Siguiente", color = Color.White)
+                }
+            } else {
+                Button(
+                    onClick = {
+
+                        navController.navigate("home") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor  = Color(0xFF4CAF50)),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text("Comenzar", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+data class OnboardingPage(val title: String, val description: String, val image: Int)
+@Composable
+fun HomeScreen(onNavigateToUserList: () -> Unit) {
+
+    val primaryColor = Color(0xFF6200EE)
+    val secondaryColor = Color(0xFF03DAC5)
+    val backgroundColor = Color(0xFFFFFFFF)
+    val textColor = Color(0xFF000000)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+        ) {
+
+            Image(
+                painter = painterResource(id = R.drawable.icon4),
+                contentDescription = "Imagen de bienvenida",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+
+            Text(
+                text = "¡Bienvenido a la App!",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                style = MaterialTheme.typography.displayMedium
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+
+            Button(
+                onClick = onNavigateToUserList,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor  = primaryColor)
+            ) {
+                Text(
+                    text = "Ver lista de usuarios",
+                    color = Color.White,
+                    fontSize = 18.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
