@@ -5,6 +5,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
 object FirebaseService {
@@ -38,5 +39,17 @@ object FirebaseService {
                 val users = snapshots?.documents?.mapNotNull { it.toObject(User::class.java) } ?: emptyList()
                 onSuccess(users)
             }
+    }
+
+    fun addRecordToUser(
+        userId: String,
+        record: Record,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        firestore.collection("users").document(userId)
+            .update("registros", FieldValue.arrayUnion(record))
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
     }
 }

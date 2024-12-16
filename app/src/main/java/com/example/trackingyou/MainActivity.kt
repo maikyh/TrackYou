@@ -448,13 +448,20 @@ fun UserCard(
                 user = user,
                 onDismiss = { showAddRecordDialog = false },
                 onRecordAdded = { newRecord ->
-                    user.registros.add(newRecord)
-                    showAddRecordDialog = false
+                    FirebaseService.addRecordToUser(
+                        userId = user.id,
+                        record = newRecord,
+                        onSuccess = {
+                            showAddRecordDialog = false
+                        },
+                        onFailure = {}
+                    )
                 }
             )
         }
     }
 }
+
 
 @Composable
 fun Avatar(user: User) {
@@ -765,6 +772,7 @@ fun UserDetailScreen(
     onNavigateBack: () -> Unit
 ) {
     var showAddRecordDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) } // Para manejar errores
 
     Scaffold(
         topBar = {
@@ -772,7 +780,7 @@ fun UserDetailScreen(
                 title = { Text("${user.nombre} ${user.apellidos}") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atras")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },
                 actions = {
@@ -825,13 +833,36 @@ fun UserDetailScreen(
                 user = user,
                 onDismiss = { showAddRecordDialog = false },
                 onRecordAdded = { newRecord ->
-                    onAddRecord(newRecord)
-                    showAddRecordDialog = false
+                    FirebaseService.addRecordToUser(
+                        userId = user.id,
+                        record = newRecord,
+                        onSuccess = {
+                            showAddRecordDialog = false
+                        },
+                        onFailure = { error ->
+                            errorMessage = error.message
+                            showAddRecordDialog = false
+                        }
+                    )
                 }
             )
         }
+
+        errorMessage?.let { msg ->
+            Snackbar(
+                action = {
+                    TextButton(onClick = { errorMessage = null }) {
+                        Text("Cerrar")
+                    }
+                },
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text(text = msg)
+            }
+        }
     }
 }
+
 
 @Composable
 fun TableHeader() {
