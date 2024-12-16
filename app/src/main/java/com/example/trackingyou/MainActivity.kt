@@ -2,6 +2,7 @@ package com.example.trackingyou
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -57,7 +58,6 @@ data class User(
     val peso: String = "",
     val registros: MutableList<Record> = mutableListOf()
 )
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,69 +70,92 @@ class MainActivity : ComponentActivity() {
             TrackingYouTheme {
                 val navController = rememberNavController()
 
-
                 var isSplashVisible by remember { mutableStateOf(true) }
+                val users = remember { mutableStateListOf<User>() }
+                var isLoading by remember { mutableStateOf(true) }
+                var errorMessage by remember { mutableStateOf<String?>(null) }
 
-
-                val users = remember {
-                    mutableStateListOf(
-                        User("Miguel", "Garza Carranza", "1.75", "70"),
-                        User("David", "Cardenas Gonzalez", "1.80", "75"),
-                        User("Felipe", "Lara Adame", "1.70", "68")
+                // Load users from Firebase
+                LaunchedEffect(Unit) {
+                    FirebaseService.fetchUsersFirestoreRealtime(
+                        onSuccess = { fetchedUsers ->
+                            users.clear()
+                            users.addAll(fetchedUsers)
+                            isLoading = false
+                        },
+                        onFailure = { error ->
+                            errorMessage = error.message
+                            isLoading = false
+                        }
                     )
                 }
 
-                // Navegación
-                NavHost(navController = navController, startDestination = if (isSplashVisible) "splash" else "onboarding") {
-                    // Ruta para el SplashScreen
+                // Navigation
+                NavHost(
+                    navController = navController,
+                    startDestination = if (isSplashVisible) "splash" else "onboarding"
+                ) {
+                    // Splash Screen
                     composable("splash") {
                         SplashScreen(onTimeout = {
                             isSplashVisible = false
-                            navController.navigate("onboarding") // Navega al onboarding después del splash
+                            navController.navigate("onboarding") {
+                                popUpTo("splash") { inclusive = true }
+                            }
                         })
                     }
 
-                    // Ruta para el onboarding
+                    // Onboarding Screen
                     composable("onboarding") {
-                        OnboardingScreen(navController) // Usamos el OnboardingScreen que ya tienes
+                        OnboardingScreen(navController)
                     }
 
-                    // Ruta para la pantalla principal (home)
+                    // Home Screen
                     composable("home") {
                         HomeScreen(
                             onNavigateToUserList = {
                                 navController.navigate("userList") {
-                                    // Evita que el usuario pueda volver al onboarding
+                                    // Prevent returning to onboarding
                                     popUpTo("onboarding") { inclusive = true }
                                 }
                             }
                         )
                     }
 
-                    // Ruta para la lista de usuarios
+                    // User List Screen
                     composable("userList") {
                         UserListScreen(
                             onUserClick = { user ->
-                                navController.navigate("userDetail/${user.nombre}_${user.apellidos}")
+                                Log.d("Navigation", "Navigating to userDetail with id: ${user.id}")
+                                navController.navigate("userDetail/${user.id}")
                             }
                         )
                     }
 
-                    // Ruta para la pantalla de detalle del usuario
+                    // User Detail Screen
                     composable(
                         "userDetail/{userId}",
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val userId = backStackEntry.arguments?.getString("userId")
-                        val user = users.find { "${it.nombre}_${it.apellidos}" == userId }
-                        user?.let {
+
+                        val user = users.find { it.id == userId }
+                        if (user != null) {
                             UserDetailScreen(
-                                user = it,
+                                user = user,
                                 onAddRecord = { newRecord ->
-                                    it.registros.add(newRecord)
+                                    user.registros.add(newRecord)
                                 },
                                 onNavigateBack = { navController.popBackStack() }
                             )
+                        } else {
+                            // Handle case when user is not found
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("User not found", color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -140,6 +163,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
