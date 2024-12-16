@@ -44,18 +44,20 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 data class Record(
-    val fecha: String,
-    val glucosa: String,
-    val presion: String
+    val fecha: String = "",
+    val glucosa: String = "",
+    val presion: String = ""
 )
 
 data class User(
-    val nombre: String,
-    val apellidos: String,
-    val estatura: String,
-    val peso: String,
+    val id: String = "", // Unique key for Firebase
+    val nombre: String = "",
+    val apellidos: String = "",
+    val estatura: String = "",
+    val peso: String = "",
     val registros: MutableList<Record> = mutableListOf()
 )
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,7 +112,6 @@ class MainActivity : ComponentActivity() {
                     // Ruta para la lista de usuarios
                     composable("userList") {
                         UserListScreen(
-                            users = users,
                             onUserClick = { user ->
                                 navController.navigate("userDetail/${user.nombre}_${user.apellidos}")
                             }
@@ -165,13 +166,29 @@ fun TopNavigationBar() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserListScreen(
-    users: MutableList<User>,
     onUserClick: (User) -> Unit
 ) {
+    val users = remember { mutableStateListOf<User>() } // State to hold users
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var showAddUserDialog by remember { mutableStateOf(false) }
     var userToEdit by remember { mutableStateOf<User?>(null) }
     var userToDelete by remember { mutableStateOf<User?>(null) }
     var searchText by remember { mutableStateOf("") } // Estado para la búsqueda
+
+    LaunchedEffect(Unit) {
+        FirebaseService.fetchUsersFirestoreRealtime(
+            onSuccess = { fetchedUsers ->
+                users.clear()
+                users.addAll(fetchedUsers)
+                isLoading = false
+            },
+            onFailure = { error ->
+                errorMessage = error.message
+                isLoading = false
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -214,15 +231,26 @@ fun UserListScreen(
                 onUserClick = onUserClick
             )
 
+            // Show Add User Dialog
             if (showAddUserDialog) {
                 AddUserDialog(
-                    titleText = "Agregar Nuevo Usuario",
+                    titleText = "Agregar Usuario",
                     onDismiss = { showAddUserDialog = false },
                     onUserAdded = { newUser ->
-                        users.add(newUser)
-                        showAddUserDialog = false
+                        FirebaseService.addUserFirestore(
+                            user = newUser,
+                            onSuccess = {
+                                users.add(newUser) // Optimistically add to local list
+                                showAddUserDialog = false // Dismiss the dialog
+                            },
+                            onFailure = { error ->
+                                errorMessage = error.message
+                                showAddUserDialog = false // Still dismiss dialog to avoid locking
+                            }
+                        )
                     }
                 )
+
             }
 
             userToEdit?.let { user ->
@@ -530,17 +558,38 @@ fun AddUserDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
-                    val isValid = nombre.isNotBlank() && apellidos.isNotBlank() &&
-                            estatura.toDoubleOrNull() != null && peso.toDoubleOrNull() != null
-                    if (isValid) {
-                        val newUser = User(nombre, apellidos, estatura, peso)
-                        onUserAdded(newUser)
+                    val newUser = initialUser?.copy(
+                        nombre = nombre,
+                        apellidos = apellidos,
+                        estatura = estatura,
+                        peso = peso
+                    ) ?: User(
+                        id = UUID.randomUUID().toString(),
+                        nombre = nombre,
+                        apellidos = apellidos,
+                        estatura = estatura,
+                        peso = peso
+                    )
+
+                    if (initialUser != null) {
+                        FirebaseService.updateUserFirestore(
+                            user = newUser,
+                            onSuccess = { onDismiss() },
+                            onFailure = {}
+                        )
+                    } else {
+                        FirebaseService.addUserFirestore(
+                            user = newUser,
+                            onSuccess = { onUserAdded(newUser) },
+                            onFailure = {}
+                        )
                     }
+                    onDismiss() // Cierra el diálogo
                 }
             ) {
-                Text(if (initialUser == null) "Agregar" else "Guardar", color = MaterialTheme.colorScheme.primary)
+                Text(if (initialUser != null) "Guardar" else "Agregar")
             }
         },
         dismissButton = {
@@ -550,6 +599,7 @@ fun AddUserDialog(
         }
     )
 }
+
 
 @Composable
 fun ConfirmDeleteDialog(
@@ -569,13 +619,24 @@ fun ConfirmDeleteDialog(
         },
         text = {
             Text(
-                "¿Estas seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta accion no se puede deshacer.",
+                "¿Estás seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta acción no se puede deshacer.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm
+                onClick = {
+                    FirebaseService.deleteUser(
+                        userId = user.id,
+                        onComplete = { success ->
+                            if (success) {
+                                onConfirm()
+                            }
+                            onDismiss()
+                        }
+                    )
+                    onDismiss()
+                }
             ) {
                 Text("Eliminar", color = MaterialTheme.colorScheme.error)
             }
@@ -827,22 +888,7 @@ fun UserCardPreview() {
     }
 }
 
-@SuppressLint("UnrememberedMutableState")
-@Preview(showBackground = true)
 @Composable
-fun UserListScreenPreview() {
-    TrackingYouTheme {
-        UserListScreen(
-            users = mutableStateListOf(
-                User("Miguel", "Garza Carranza", "1.75", "70"),
-                User("David", "Cardenas Gonzalez", "1.80", "75"),
-                User("Felipe", "Lara Adame", "1.70", "68")
-            ),
-            onUserClick = {}
-        )
-    }
-
-}@Composable
 fun SplashScreen(onTimeout: () -> Unit) {
 
     val imageModifier = Modifier
