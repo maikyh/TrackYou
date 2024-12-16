@@ -38,6 +38,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.trackingyou.ui.theme.TrackingYouTheme
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
@@ -58,6 +59,10 @@ data class User(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Firebase
+        FirebaseApp.initializeApp(this)
+
         enableEdgeToEdge()
         setContent {
             TrackingYouTheme {
