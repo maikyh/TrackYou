@@ -431,6 +431,11 @@ fun AddUserDialog(
     var estatura by remember { mutableStateOf(initialUser?.estatura ?: "") }
     var peso by remember { mutableStateOf(initialUser?.peso ?: "") }
 
+    var nombreError by remember { mutableStateOf(false) }
+    var apellidosError by remember { mutableStateOf(false) }
+    var estaturaError by remember { mutableStateOf(false) }
+    var pesoError by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -444,40 +449,87 @@ fun AddUserDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = nombre,
-                    onValueChange = { nombre = it },
+                    onValueChange = {
+                        nombre = it
+                        nombreError = it.isBlank()
+                    },
                     label = { Text("Nombre") },
                     singleLine = true,
+                    isError = nombreError,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (nombreError) {
+                    Text(
+                        text = "El nombre no puede estar vacío",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = apellidos,
-                    onValueChange = { apellidos = it },
+                    onValueChange = {
+                        apellidos = it
+                        apellidosError = it.isBlank()
+                    },
                     label = { Text("Apellidos") },
                     singleLine = true,
+                    isError = apellidosError,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (apellidosError) {
+                    Text(
+                        text = "Los apellidos no pueden estar vacíos",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = estatura,
-                    onValueChange = { estatura = it },
+                    onValueChange = {
+                        estatura = it
+                        estaturaError = it.toDoubleOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Estatura (m)") },
                     singleLine = true,
+                    isError = estaturaError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (estaturaError) {
+                    Text(
+                        text = "Ingrese una estatura válida",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = peso,
-                    onValueChange = { peso = it },
+                    onValueChange = {
+                        peso = it
+                        pesoError = it.toDoubleOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Peso (kg)") },
                     singleLine = true,
+                    isError = pesoError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (pesoError) {
+                    Text(
+                        text = "Ingrese un peso válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (nombre.isNotBlank() && apellidos.isNotBlank() &&
-                        estatura.isNotBlank() && peso.isNotBlank()
-                    ) {
+                    val isValid = nombre.isNotBlank() && apellidos.isNotBlank() &&
+                            estatura.toDoubleOrNull() != null && peso.toDoubleOrNull() != null
+                    if (isValid) {
                         val newUser = User(nombre, apellidos, estatura, peso)
                         onUserAdded(newUser)
                     }
@@ -540,6 +592,9 @@ fun AddRecordDialog(
     var glucosa by remember { mutableStateOf("") }
     var presion by remember { mutableStateOf("") }
 
+    var glucosaError by remember { mutableStateOf(false) }
+    var presionError by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -553,24 +608,48 @@ fun AddRecordDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = glucosa,
-                    onValueChange = { glucosa = it },
+                    onValueChange = {
+                        glucosa = it
+                        glucosaError = it.toIntOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Glucosa (mg/dL)") },
                     singleLine = true,
+                    isError = glucosaError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (glucosaError) {
+                    Text(
+                        text = "Ingrese un valor de glucosa válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = presion,
-                    onValueChange = { presion = it },
-                    label = { Text("Presion Arterial (mmHg)") },
+                    onValueChange = {
+                        presion = it
+                        presionError = it.toIntOrNull() == null || it.isBlank()
+                    },
+                    label = { Text("Presión Arterial (mmHg)") },
                     singleLine = true,
+                    isError = presionError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (presionError) {
+                    Text(
+                        text = "Ingrese un valor de presión válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (glucosa.isNotBlank() && presion.isNotBlank()) {
+                    val isValid = glucosa.toIntOrNull() != null && presion.toIntOrNull() != null
+                    if (isValid) {
                         val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
                         val newRecord = Record(fecha, glucosa, presion)
                         onRecordAdded(newRecord)
@@ -587,6 +666,7 @@ fun AddRecordDialog(
         }
     )
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
