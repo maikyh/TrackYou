@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -58,6 +59,7 @@ data class User(
     val peso: String = "",
     val registros: MutableList<Record> = mutableListOf()
 )
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,104 +70,84 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TrackingYouTheme {
-                val navController = rememberNavController()
-
-                var isSplashVisible by remember { mutableStateOf(true) }
-                val users = remember { mutableStateListOf<User>() }
-                var isLoading by remember { mutableStateOf(true) }
-                var errorMessage by remember { mutableStateOf<String?>(null) }
-
-                // Load users from Firebase
-                LaunchedEffect(Unit) {
-                    FirebaseService.fetchUsersFirestoreRealtime(
-                        onSuccess = { fetchedUsers ->
-                            val sortedUsers = fetchedUsers.sortedBy { it.nombre.lowercase(Locale.getDefault()) }
-                            users.clear()
-                            users.addAll(sortedUsers)
-                            isLoading = false
-                        },
-                        onFailure = { error ->
-                            errorMessage = error.message
-                            isLoading = false
-                        }
-                    )
-                }
-
-                // Navigation
-                NavHost(
-                    navController = navController,
-                    startDestination = if (isSplashVisible) "splash" else "onboarding"
-                ) {
-                    // Splash Screen
-                    composable("splash") {
-                        SplashScreen(onTimeout = {
-                            isSplashVisible = false
-                            navController.navigate("onboarding") {
-                                popUpTo("splash") { inclusive = true }
-                            }
-                        })
-                    }
-
-                    // Onboarding Screen
-                    composable("onboarding") {
-                        OnboardingScreen(navController)
-                    }
-
-                    // Home Screen
-                    composable("home") {
-                        HomeScreen(
-                            onNavigateToUserList = {
-                                navController.navigate("userList") {
-                                    // Prevent returning to onboarding
-                                    popUpTo("onboarding") { inclusive = true }
-                                }
-                            }
-                        )
-                    }
-
-                    // User List Screen
-                    composable("userList") {
-                        UserListScreen(
-                            onUserClick = { user ->
-                                Log.d("Navigation", "Navigating to userDetail with id: ${user.id}")
-                                navController.navigate("userDetail/${user.id}")
-                            }
-                        )
-                    }
-
-                    // User Detail Screen
-                    composable(
-                        "userDetail/{userId}",
-                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val userId = backStackEntry.arguments?.getString("userId")
-
-                        val user = users.find { it.id == userId }
-                        if (user != null) {
-                            UserDetailScreen(
-                                user = user,
-                                onAddRecord = { newRecord ->
-                                    user.registros.add(newRecord)
-                                },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        } else {
-                            // Handle case when user is not found
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("User not found", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
+                val onboardingViewModel: OnboardingViewModel = viewModel()
+                AppNavigation(onboardingViewModel)
             }
         }
     }
 }
 
+@Composable
+fun AppNavigation(onboardingViewModel: OnboardingViewModel) {
+    val navController = rememberNavController()
 
+    val isOnboardingShown by onboardingViewModel.isOnboardingShown.collectAsState()
+
+    val startDestination = if (!isOnboardingShown) "onboarding" else "splash"
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable("splash") {
+            SplashScreen(onTimeout = {
+                navController.navigate("home") {
+                    popUpTo("splash") { inclusive = true }
+                }
+            })
+        }
+
+        composable("onboarding") {
+            OnboardingScreen(navController, onboardingViewModel)
+        }
+
+        composable("home") {
+            HomeScreen(
+                onNavigateToUserList = {
+                    navController.navigate("userList") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("userList") {
+            UserListScreen(
+                onUserClick = { user ->
+                    Log.d("Navigation", "Navigating to userDetail with id: ${user.id}")
+                    navController.navigate("userDetail/${user.id}")
+                }
+            )
+        }
+
+        composable(
+            "userDetail/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")
+            val userListViewModel: UserListViewModel = viewModel()
+            val users by userListViewModel.users.collectAsState()
+
+            val user = users.find { it.id == userId }
+            if (user != null) {
+                UserDetailScreen(
+                    user = user,
+                    onAddRecord = { newRecord ->
+                        userListViewModel.addRecord(user, newRecord)
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Usuario no encontrado", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
