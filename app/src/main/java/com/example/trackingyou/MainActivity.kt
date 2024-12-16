@@ -264,12 +264,11 @@ fun UserListScreen(
                         FirebaseService.addUserFirestore(
                             user = newUser,
                             onSuccess = {
-                                users.add(newUser) // Optimistically add to local list
-                                showAddUserDialog = false // Dismiss the dialog
+                                showAddUserDialog = false
                             },
                             onFailure = { error ->
                                 errorMessage = error.message
-                                showAddUserDialog = false // Still dismiss dialog to avoid locking
+                                showAddUserDialog = false
                             }
                         )
                     }
@@ -590,7 +589,7 @@ fun AddUserDialog(
                         estatura = estatura,
                         peso = peso
                     ) ?: User(
-                        id = UUID.randomUUID().toString(),
+                        id = UUID.randomUUID().toString(), // Asegura un ID único
                         nombre = nombre,
                         apellidos = apellidos,
                         estatura = estatura,
