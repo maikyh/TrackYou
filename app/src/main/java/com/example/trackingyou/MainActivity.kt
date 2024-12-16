@@ -79,8 +79,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     FirebaseService.fetchUsersFirestoreRealtime(
                         onSuccess = { fetchedUsers ->
+                            val sortedUsers = fetchedUsers.sortedBy { it.nombre.lowercase(Locale.getDefault()) }
                             users.clear()
-                            users.addAll(fetchedUsers)
+                            users.addAll(sortedUsers)
                             isLoading = false
                         },
                         onFailure = { error ->
@@ -203,8 +204,9 @@ fun UserListScreen(
     LaunchedEffect(Unit) {
         FirebaseService.fetchUsersFirestoreRealtime(
             onSuccess = { fetchedUsers ->
+                val sortedUsers = fetchedUsers.sortedBy { it.nombre.lowercase(Locale.getDefault()) }
                 users.clear()
-                users.addAll(fetchedUsers)
+                users.addAll(sortedUsers)
                 isLoading = false
             },
             onFailure = { error ->
@@ -243,11 +245,13 @@ fun UserListScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // Filtrar usuarios según el texto de búsqueda
-            val filteredUsers = users.filter {
-                it.nombre.contains(searchText, ignoreCase = true) ||
-                        it.apellidos.contains(searchText, ignoreCase = true)
-            }
+            val filteredUsers = users
+                .filter {
+                    it.nombre.contains(searchText, ignoreCase = true) ||
+                            it.apellidos.contains(searchText, ignoreCase = true)
+                }
+                .sortedBy { it.nombre.lowercase(Locale.getDefault()) }
+
             UserCellList(
                 users = filteredUsers,
                 onEditUser = { user -> userToEdit = user },
@@ -763,7 +767,6 @@ fun AddRecordDialog(
     )
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserDetailScreen(
@@ -818,10 +821,13 @@ fun UserDetailScreen(
                 }
             } else {
                 TableHeader()
+                val sortedRecords = remember(user.registros) {
+                    user.registros.sortedBy { it.fecha }
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(user.registros) { record ->
+                    items(sortedRecords) { record ->
                         TableRow(record)
                     }
                 }
@@ -837,6 +843,7 @@ fun UserDetailScreen(
                         userId = user.id,
                         record = newRecord,
                         onSuccess = {
+                            onAddRecord(newRecord) // Opcional: si deseas realizar acciones adicionales
                             showAddRecordDialog = false
                         },
                         onFailure = { error ->
