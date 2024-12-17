@@ -485,6 +485,21 @@ fun AddUserDialog(
     var estaturaError by remember { mutableStateOf(false) }
     var pesoError by remember { mutableStateOf(false) }
 
+    // Función de validación
+    fun validateInputs(): Boolean {
+        val isNombreValid = isValidName(nombre)
+        val isApellidosValid = isValidName(apellidos)
+        val isEstaturaValid = estatura.toDoubleOrNull() != null && estatura.isNotBlank()
+        val isPesoValid = peso.toDoubleOrNull() != null && peso.isNotBlank()
+
+        nombreError = nombre.isBlank() || !isNombreValid
+        apellidosError = apellidos.isBlank() || !isApellidosValid
+        estaturaError = !isEstaturaValid
+        pesoError = !isPesoValid
+
+        return isNombreValid && isApellidosValid && isEstaturaValid && isPesoValid
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -500,16 +515,17 @@ fun AddUserDialog(
                     value = nombre,
                     onValueChange = {
                         nombre = it
-                        nombreError = it.isBlank()
+                        nombreError = it.isBlank() || !isValidName(it)
                     },
                     label = { Text("Nombre") },
                     singleLine = true,
                     isError = nombreError,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+
                 )
                 if (nombreError) {
                     Text(
-                        text = "El nombre no puede estar vacío",
+                        text = if (nombre.isBlank()) "El nombre no puede estar vacío" else "El nombre no puede contener números ni caracteres especiales",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp
                     )
@@ -519,16 +535,16 @@ fun AddUserDialog(
                     value = apellidos,
                     onValueChange = {
                         apellidos = it
-                        apellidosError = it.isBlank()
+                        apellidosError = it.isBlank() || !isValidName(it)
                     },
                     label = { Text("Apellidos") },
                     singleLine = true,
                     isError = apellidosError,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 if (apellidosError) {
                     Text(
-                        text = "Los apellidos no pueden estar vacíos",
+                        text = if (apellidos.isBlank()) "Los apellidos no pueden estar vacíos" else "Los apellidos no pueden contener números ni caracteres especiales",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp
                     )
@@ -576,34 +592,37 @@ fun AddUserDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val newUser = initialUser?.copy(
-                        nombre = nombre,
-                        apellidos = apellidos,
-                        estatura = estatura,
-                        peso = peso
-                    ) ?: User(
-                        id = UUID.randomUUID().toString(), // Asegura un ID único
-                        nombre = nombre,
-                        apellidos = apellidos,
-                        estatura = estatura,
-                        peso = peso
-                    )
+                    if (validateInputs()) {
+                        val newUser = initialUser?.copy(
+                            nombre = nombre,
+                            apellidos = apellidos,
+                            estatura = estatura,
+                            peso = peso
+                        ) ?: User(
+                            id = UUID.randomUUID().toString(), // Asegura un ID único
+                            nombre = nombre,
+                            apellidos = apellidos,
+                            estatura = estatura,
+                            peso = peso
+                        )
 
-                    if (initialUser != null) {
-                        FirebaseService.updateUserFirestore(
-                            user = newUser,
-                            onSuccess = { onDismiss() },
-                            onFailure = {}
-                        )
-                    } else {
-                        FirebaseService.addUserFirestore(
-                            user = newUser,
-                            onSuccess = { onUserAdded(newUser) },
-                            onFailure = {}
-                        )
+                        if (initialUser != null) {
+                            FirebaseService.updateUserFirestore(
+                                user = newUser,
+                                onSuccess = { onDismiss() },
+                                onFailure = { /* Manejar el error si es necesario */ }
+                            )
+                        } else {
+                            FirebaseService.addUserFirestore(
+                                user = newUser,
+                                onSuccess = { onUserAdded(newUser) },
+                                onFailure = { /* Manejar el error si es necesario */ }
+                            )
+                        }
+                        onDismiss() // Cierra el diálogo
                     }
-                    onDismiss() // Cierra el diálogo
-                }
+                },
+                enabled = !nombreError && !apellidosError && !estaturaError && !pesoError
             ) {
                 Text(if (initialUser != null) "Guardar" else "Agregar")
             }
@@ -616,6 +635,9 @@ fun AddUserDialog(
     )
 }
 
+fun isValidName(input: String): Boolean {
+    return input.matches(Regex("^[A-Za-zÀ-ÿ '-]+$"))
+}
 
 @Composable
 fun ConfirmDeleteDialog(
