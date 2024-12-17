@@ -1,14 +1,13 @@
 package com.example.trackingyou
 
-import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -33,108 +31,119 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.trackingyou.ui.theme.TrackingYouTheme
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
 data class Record(
-    val fecha: String,
-    val glucosa: String,
-    val presion: String
+    val fecha: String = "",
+    val glucosa: String = "",
+    val presion: String = ""
 )
 
 data class User(
-    val nombre: String,
-    val apellidos: String,
-    val estatura: String,
-    val peso: String,
+    val id: String = "",
+    val nombre: String = "",
+    val apellidos: String = "",
+    val estatura: String = "",
+    val peso: String = "",
     val registros: MutableList<Record> = mutableListOf()
 )
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        FirebaseApp.initializeApp(this)
+
         enableEdgeToEdge()
         setContent {
             TrackingYouTheme {
-                val navController = rememberNavController()
-
-
-                var isSplashVisible by remember { mutableStateOf(true) }
-
-
-                val users = remember {
-                    mutableStateListOf(
-                        User("Miguel", "Garza Carranza", "1.75", "70"),
-                        User("David", "Cardenas Gonzalez", "1.80", "75"),
-                        User("Felipe", "Lara Adame", "1.70", "68")
-                    )
-                }
-
-                // Navegación
-                NavHost(navController = navController, startDestination = if (isSplashVisible) "splash" else "onboarding") {
-                    // Ruta para el SplashScreen
-                    composable("splash") {
-                        SplashScreen(onTimeout = {
-                            isSplashVisible = false
-                            navController.navigate("onboarding") // Navega al onboarding después del splash
-                        })
-                    }
-
-                    // Ruta para el onboarding
-                    composable("onboarding") {
-                        OnboardingScreen(navController) // Usamos el OnboardingScreen que ya tienes
-                    }
-
-                    // Ruta para la pantalla principal (home)
-                    composable("home") {
-                        HomeScreen(
-                            onNavigateToUserList = {
-                                navController.navigate("userList") {
-                                    // Evita que el usuario pueda volver al onboarding
-                                    popUpTo("onboarding") { inclusive = true }
-                                }
-                            }
-                        )
-                    }
-
-                    // Ruta para la lista de usuarios
-                    composable("userList") {
-                        UserListScreen(
-                            users = users,
-                            onUserClick = { user ->
-                                navController.navigate("userDetail/${user.nombre}_${user.apellidos}")
-                            }
-                        )
-                    }
-
-                    // Ruta para la pantalla de detalle del usuario
-                    composable(
-                        "userDetail/{userId}",
-                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val userId = backStackEntry.arguments?.getString("userId")
-                        val user = users.find { "${it.nombre}_${it.apellidos}" == userId }
-                        user?.let {
-                            UserDetailScreen(
-                                user = it,
-                                onAddRecord = { newRecord ->
-                                    it.registros.add(newRecord)
-                                },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
-                    }
-                }
+                val onboardingViewModel: OnboardingViewModel = viewModel()
+                AppNavigation(onboardingViewModel)
             }
         }
     }
 }
 
+@Composable
+fun AppNavigation(onboardingViewModel: OnboardingViewModel) {
+    val navController = rememberNavController()
+
+    val isOnboardingShown by onboardingViewModel.isOnboardingShown.collectAsState()
+
+    val startDestination = if (!isOnboardingShown) "onboarding" else "splash"
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable("splash") {
+            SplashScreen(onTimeout = {
+                navController.navigate("home") {
+                    popUpTo("splash") { inclusive = true }
+                }
+            })
+        }
+
+        composable("onboarding") {
+            OnboardingScreen(navController, onboardingViewModel)
+        }
+
+        composable("home") {
+            HomeScreen(
+                onNavigateToUserList = {
+                    navController.navigate("userList") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("userList") {
+            UserListScreen(
+                onUserClick = { user ->
+                    Log.d("Navigation", "Navigating to userDetail with id: ${user.id}")
+                    navController.navigate("userDetail/${user.id}")
+                }
+            )
+        }
+
+        composable(
+            "userDetail/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId")
+            val userListViewModel: UserListViewModel = viewModel()
+            val users by userListViewModel.users.collectAsState()
+
+            val user = users.find { it.id == userId }
+            if (user != null) {
+                UserDetailScreen(
+                    user = user,
+                    onAddRecord = { newRecord ->
+                        userListViewModel.addRecord(user, newRecord)
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Usuario no encontrado", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,16 +166,32 @@ fun TopNavigationBar() {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserListScreen(
-    users: MutableList<User>,
     onUserClick: (User) -> Unit
 ) {
+    val users = remember { mutableStateListOf<User>() } // State to hold users
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var showAddUserDialog by remember { mutableStateOf(false) }
     var userToEdit by remember { mutableStateOf<User?>(null) }
     var userToDelete by remember { mutableStateOf<User?>(null) }
     var searchText by remember { mutableStateOf("") } // Estado para la búsqueda
+
+    LaunchedEffect(Unit) {
+        FirebaseService.fetchUsersFirestoreRealtime(
+            onSuccess = { fetchedUsers ->
+                val sortedUsers = fetchedUsers.sortedBy { it.nombre.lowercase(Locale.getDefault()) }
+                users.clear()
+                users.addAll(sortedUsers)
+                isLoading = false
+            },
+            onFailure = { error ->
+                errorMessage = error.message
+                isLoading = false
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -197,11 +222,13 @@ fun UserListScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // Filtrar usuarios según el texto de búsqueda
-            val filteredUsers = users.filter {
-                it.nombre.contains(searchText, ignoreCase = true) ||
-                        it.apellidos.contains(searchText, ignoreCase = true)
-            }
+            val filteredUsers = users
+                .filter {
+                    it.nombre.contains(searchText, ignoreCase = true) ||
+                            it.apellidos.contains(searchText, ignoreCase = true)
+                }
+                .sortedBy { it.nombre.lowercase(Locale.getDefault()) }
+
             UserCellList(
                 users = filteredUsers,
                 onEditUser = { user -> userToEdit = user },
@@ -209,15 +236,25 @@ fun UserListScreen(
                 onUserClick = onUserClick
             )
 
+            // Show Add User Dialog
             if (showAddUserDialog) {
                 AddUserDialog(
-                    titleText = "Agregar Nuevo Usuario",
+                    titleText = "Agregar Usuario",
                     onDismiss = { showAddUserDialog = false },
                     onUserAdded = { newUser ->
-                        users.add(newUser)
-                        showAddUserDialog = false
+                        FirebaseService.addUserFirestore(
+                            user = newUser,
+                            onSuccess = {
+                                showAddUserDialog = false
+                            },
+                            onFailure = { error ->
+                                errorMessage = error.message
+                                showAddUserDialog = false
+                            }
+                        )
                     }
                 )
+
             }
 
             userToEdit?.let { user ->
@@ -392,13 +429,20 @@ fun UserCard(
                 user = user,
                 onDismiss = { showAddRecordDialog = false },
                 onRecordAdded = { newRecord ->
-                    user.registros.add(newRecord)
-                    showAddRecordDialog = false
+                    FirebaseService.addRecordToUser(
+                        userId = user.id,
+                        record = newRecord,
+                        onSuccess = {
+                            showAddRecordDialog = false
+                        },
+                        onFailure = {}
+                    )
                 }
             )
         }
     }
 }
+
 
 @Composable
 fun Avatar(user: User) {
@@ -431,6 +475,26 @@ fun AddUserDialog(
     var estatura by remember { mutableStateOf(initialUser?.estatura ?: "") }
     var peso by remember { mutableStateOf(initialUser?.peso ?: "") }
 
+    var nombreError by remember { mutableStateOf(false) }
+    var apellidosError by remember { mutableStateOf(false) }
+    var estaturaError by remember { mutableStateOf(false) }
+    var pesoError by remember { mutableStateOf(false) }
+
+    // Función de validación
+    fun validateInputs(): Boolean {
+        val isNombreValid = isValidName(nombre)
+        val isApellidosValid = isValidName(apellidos)
+        val isEstaturaValid = estatura.toDoubleOrNull() != null && estatura.isNotBlank()
+        val isPesoValid = peso.toDoubleOrNull() != null && peso.isNotBlank()
+
+        nombreError = nombre.isBlank() || !isNombreValid
+        apellidosError = apellidos.isBlank() || !isApellidosValid
+        estaturaError = !isEstaturaValid
+        pesoError = !isPesoValid
+
+        return isNombreValid && isApellidosValid && isEstaturaValid && isPesoValid
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -444,46 +508,118 @@ fun AddUserDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = nombre,
-                    onValueChange = { nombre = it },
+                    onValueChange = {
+                        nombre = it
+                        nombreError = it.isBlank() || !isValidName(it)
+                    },
                     label = { Text("Nombre") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    isError = nombreError,
+                    modifier = Modifier.fillMaxWidth(),
+
                 )
+                if (nombreError) {
+                    Text(
+                        text = if (nombre.isBlank()) "El nombre no puede estar vacío" else "El nombre no puede contener números ni caracteres especiales",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = apellidos,
-                    onValueChange = { apellidos = it },
+                    onValueChange = {
+                        apellidos = it
+                        apellidosError = it.isBlank() || !isValidName(it)
+                    },
                     label = { Text("Apellidos") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    isError = apellidosError,
+                    modifier = Modifier.fillMaxWidth(),
                 )
+                if (apellidosError) {
+                    Text(
+                        text = if (apellidos.isBlank()) "Los apellidos no pueden estar vacíos" else "Los apellidos no pueden contener números ni caracteres especiales",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = estatura,
-                    onValueChange = { estatura = it },
+                    onValueChange = {
+                        estatura = it
+                        estaturaError = it.toDoubleOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Estatura (m)") },
                     singleLine = true,
+                    isError = estaturaError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (estaturaError) {
+                    Text(
+                        text = "Ingrese una estatura válida",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = peso,
-                    onValueChange = { peso = it },
+                    onValueChange = {
+                        peso = it
+                        pesoError = it.toDoubleOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Peso (kg)") },
                     singleLine = true,
+                    isError = pesoError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (pesoError) {
+                    Text(
+                        text = "Ingrese un peso válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
-                    if (nombre.isNotBlank() && apellidos.isNotBlank() &&
-                        estatura.isNotBlank() && peso.isNotBlank()
-                    ) {
-                        val newUser = User(nombre, apellidos, estatura, peso)
-                        onUserAdded(newUser)
+                    if (validateInputs()) {
+                        val newUser = initialUser?.copy(
+                            nombre = nombre,
+                            apellidos = apellidos,
+                            estatura = estatura,
+                            peso = peso
+                        ) ?: User(
+                            id = UUID.randomUUID().toString(), // Asegura un ID único
+                            nombre = nombre,
+                            apellidos = apellidos,
+                            estatura = estatura,
+                            peso = peso
+                        )
+
+                        if (initialUser != null) {
+                            FirebaseService.updateUserFirestore(
+                                user = newUser,
+                                onSuccess = { onDismiss() },
+                                onFailure = { /* Manejar el error si es necesario */ }
+                            )
+                        } else {
+                            FirebaseService.addUserFirestore(
+                                user = newUser,
+                                onSuccess = { onUserAdded(newUser) },
+                                onFailure = { /* Manejar el error si es necesario */ }
+                            )
+                        }
+                        onDismiss() // Cierra el diálogo
                     }
-                }
+                },
+                enabled = !nombreError && !apellidosError && !estaturaError && !pesoError
             ) {
-                Text(if (initialUser == null) "Agregar" else "Guardar", color = MaterialTheme.colorScheme.primary)
+                Text(if (initialUser != null) "Guardar" else "Agregar")
             }
         },
         dismissButton = {
@@ -492,6 +628,10 @@ fun AddUserDialog(
             }
         }
     )
+}
+
+fun isValidName(input: String): Boolean {
+    return input.matches(Regex("^[A-Za-zÀ-ÿ '-]+$"))
 }
 
 @Composable
@@ -512,13 +652,24 @@ fun ConfirmDeleteDialog(
         },
         text = {
             Text(
-                "¿Estas seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta accion no se puede deshacer.",
+                "¿Estás seguro de que deseas eliminar a ${user.nombre} ${user.apellidos}? Esta acción no se puede deshacer.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm
+                onClick = {
+                    FirebaseService.deleteUser(
+                        userId = user.id,
+                        onComplete = { success ->
+                            if (success) {
+                                onConfirm()
+                            }
+                            onDismiss()
+                        }
+                    )
+                    onDismiss()
+                }
             ) {
                 Text("Eliminar", color = MaterialTheme.colorScheme.error)
             }
@@ -540,6 +691,9 @@ fun AddRecordDialog(
     var glucosa by remember { mutableStateOf("") }
     var presion by remember { mutableStateOf("") }
 
+    var glucosaError by remember { mutableStateOf(false) }
+    var presionError by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -553,24 +707,48 @@ fun AddRecordDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = glucosa,
-                    onValueChange = { glucosa = it },
+                    onValueChange = {
+                        glucosa = it
+                        glucosaError = it.toIntOrNull() == null || it.isBlank()
+                    },
                     label = { Text("Glucosa (mg/dL)") },
                     singleLine = true,
+                    isError = glucosaError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (glucosaError) {
+                    Text(
+                        text = "Ingrese un valor de glucosa válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+
                 OutlinedTextField(
                     value = presion,
-                    onValueChange = { presion = it },
-                    label = { Text("Presion Arterial (mmHg)") },
+                    onValueChange = {
+                        presion = it
+                        presionError = it.toIntOrNull() == null || it.isBlank()
+                    },
+                    label = { Text("Presión Arterial (mmHg)") },
                     singleLine = true,
+                    isError = presionError,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (presionError) {
+                    Text(
+                        text = "Ingrese un valor de presión válido",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (glucosa.isNotBlank() && presion.isNotBlank()) {
+                    val isValid = glucosa.toIntOrNull() != null && presion.toIntOrNull() != null
+                    if (isValid) {
                         val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
                         val newRecord = Record(fecha, glucosa, presion)
                         onRecordAdded(newRecord)
@@ -596,6 +774,7 @@ fun UserDetailScreen(
     onNavigateBack: () -> Unit
 ) {
     var showAddRecordDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) } // Para manejar errores
 
     Scaffold(
         topBar = {
@@ -603,7 +782,7 @@ fun UserDetailScreen(
                 title = { Text("${user.nombre} ${user.apellidos}") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atras")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },
                 actions = {
@@ -641,10 +820,13 @@ fun UserDetailScreen(
                 }
             } else {
                 TableHeader()
+                val sortedRecords = remember(user.registros) {
+                    user.registros.sortedBy { it.fecha }
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(user.registros) { record ->
+                    items(sortedRecords) { record ->
                         TableRow(record)
                     }
                 }
@@ -656,13 +838,37 @@ fun UserDetailScreen(
                 user = user,
                 onDismiss = { showAddRecordDialog = false },
                 onRecordAdded = { newRecord ->
-                    onAddRecord(newRecord)
-                    showAddRecordDialog = false
+                    FirebaseService.addRecordToUser(
+                        userId = user.id,
+                        record = newRecord,
+                        onSuccess = {
+                            onAddRecord(newRecord) // Opcional: si deseas realizar acciones adicionales
+                            showAddRecordDialog = false
+                        },
+                        onFailure = { error ->
+                            errorMessage = error.message
+                            showAddRecordDialog = false
+                        }
+                    )
                 }
             )
         }
+
+        errorMessage?.let { msg ->
+            Snackbar(
+                action = {
+                    TextButton(onClick = { errorMessage = null }) {
+                        Text("Cerrar")
+                    }
+                },
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text(text = msg)
+            }
+        }
     }
 }
+
 
 @Composable
 fun TableHeader() {
@@ -742,22 +948,7 @@ fun UserCardPreview() {
     }
 }
 
-@SuppressLint("UnrememberedMutableState")
-@Preview(showBackground = true)
 @Composable
-fun UserListScreenPreview() {
-    TrackingYouTheme {
-        UserListScreen(
-            users = mutableStateListOf(
-                User("Miguel", "Garza Carranza", "1.75", "70"),
-                User("David", "Cardenas Gonzalez", "1.80", "75"),
-                User("Felipe", "Lara Adame", "1.70", "68")
-            ),
-            onUserClick = {}
-        )
-    }
-
-}@Composable
 fun SplashScreen(onTimeout: () -> Unit) {
 
     val imageModifier = Modifier
