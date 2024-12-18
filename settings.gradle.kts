@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TrackingYou"
+rootProject.name = "android_final"
 include(":app")
  
